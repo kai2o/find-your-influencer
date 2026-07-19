@@ -56,14 +56,15 @@ jobs:
         id: prep
         run: |
           cp .env.example .env
-          KEY="$(php artisan key:generate --show --no-ansi)"
+          KEY="$(php artisan key:generate --show --no-ansi | tr -d '\r')"
+          # Write a dedicated testing env so Laravel has APP_KEY under APP_ENV=testing
+          cp .env .env.testing
           echo "APP_KEY=$KEY" >> .env
+          echo "APP_KEY=$KEY" >> .env.testing
           echo "app_key=$KEY" >> "$GITHUB_OUTPUT"
 
       - name: Tests
         env:
-          # Keep APP_KEY in the process env. Do NOT set APP_ENV here — that would
-          # make Laravel ignore .env and boot without a key before phpunit.xml loads.
           APP_KEY: ${{ steps.prep.outputs.app_key }}
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
@@ -76,15 +77,15 @@ jobs:
           PROFILE_PROVIDER: fake
           WEBHOOK_SECRET: test-webhook-secret
         run: |
-          set -o pipefail
-          php artisan test --colors=never 2>&1 | tee pest-output.txt
-          status=${PIPESTATUS[0]}
+          set +e
+          ./vendor/bin/pest --colors=never > pest-output.txt 2>&1
+          status=$?
+          echo "::group::Test output"
+          cat pest-output.txt
+          echo "::endgroup::"
           if [ "$status" -ne 0 ]; then
-            echo "::group::Test output"
-            cat pest-output.txt
-            echo "::endgroup::"
-            tail -n 40 pest-output.txt | while IFS= read -r line; do
+            tail -n 50 pest-output.txt | while IFS= read -r line; do
               echo "::error::$line"
             done
-            exit "$status"
           fi
+          exit "$status"
