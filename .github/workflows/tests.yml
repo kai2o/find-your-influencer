@@ -16,14 +16,14 @@ jobs:
 
     services:
       redis:
-        image: redis:7
+        image: redis:7-alpine
         ports:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -32,10 +32,10 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.4
+          php-version: '8.3'
           tools: composer:v2
           coverage: none
-          extensions: redis, pdo_sqlite
+          extensions: mbstring, xml, ctype, curl, dom, tokenizer, pdo, pdo_sqlite, redis, zip, bcmath, fileinfo, intl
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,30 +43,21 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Install Composer Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
       - name: Install Node Dependencies
         run: npm ci
 
       - name: Build Assets
         run: npm run build
 
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Copy Environment File
+      - name: Prepare environment
         run: |
           cp .env.example .env
-          # CI uses sqlite in-memory via phpunit.xml (force=true); keep Redis for lock/quota tests.
-          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
-          sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=array/' .env
-          sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
-          sed -i 's/^CACHE_STORE=.*/CACHE_STORE=array/' .env
-          echo 'DB_DATABASE=:memory:' >> .env
-
-      - name: Generate Application Key
-        run: php artisan key:generate
+          php artisan key:generate --force
 
       - name: Tests
-        run: ./vendor/bin/pest --ci
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
@@ -74,6 +65,21 @@ jobs:
           CACHE_STORE: array
           SESSION_DRIVER: array
           QUEUE_CONNECTION: sync
+          REDIS_CLIENT: predis
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
           PROFILE_PROVIDER: fake
+          WEBHOOK_SECRET: test-webhook-secret
+        run: |
+          set -o pipefail
+          php artisan test --colors=never 2>&1 | tee pest-output.txt
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Test output"
+            cat pest-output.txt
+            echo "::endgroup::"
+            tail -n 40 pest-output.txt | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit "$status"
+          fi
