@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
+import { LoaderCircle } from 'lucide-react';
 import { FormEvent } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -43,8 +44,9 @@ export default function WatchlistCreate() {
                         />
                         <InputError message={errors.username} />
                     </div>
-                    <Button type="submit" disabled={processing}>
-                        Add to watchlist
+                    <Button type="submit" disabled={processing} className="inline-flex items-center gap-2">
+                        {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                        {processing ? 'Adding…' : 'Add to watchlist'}
                     </Button>
                 </form>
             </div>

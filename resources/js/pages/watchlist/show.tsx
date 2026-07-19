@@ -4,7 +4,8 @@ import { pushToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { useEffect, useMemo, useRef } from 'react';
+import { LoaderCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Profile = {
     id: number;
@@ -152,11 +153,17 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
 
     const previousStatus = useRef(profile.status);
     const toastedFailure = useRef(false);
+    const [refetching, setRefetching] = useState(false);
+    const [removing, setRemoving] = useState(false);
+
+    const fetchInFlight = profile.status === 'pending' || profile.status === 'fetching';
+    const refetchBusy = refetching || fetchInFlight;
 
     useEffect(() => {
         const inFlight = profile.status === 'pending' || profile.status === 'fetching';
 
         if (!inFlight) {
+            setRefetching(false);
             return;
         }
 
@@ -188,7 +195,10 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
 
     const refetch = () => {
         toastedFailure.current = false;
-        router.post(`/watchlist/${profile.id}/refetch`);
+        setRefetching(true);
+        router.post(`/watchlist/${profile.id}/refetch`, {}, {
+            onError: () => setRefetching(false),
+        });
     };
 
     const remove = () => {
@@ -199,7 +209,11 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
         ) {
             return;
         }
-        router.delete(`/watchlist/${profile.id}`);
+        setRemoving(true);
+        router.delete(`/watchlist/${profile.id}`, {
+            onFinish: () => setRemoving(false),
+            onError: () => setRemoving(false),
+        });
     };
 
     const net = formatDelta(performance.period_net_delta);
@@ -241,15 +255,22 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Button onClick={refetch} disabled={profile.status === 'fetching'}>
-                            Re-fetch now
+                        <Button
+                            onClick={refetch}
+                            disabled={refetchBusy || removing}
+                            className="inline-flex items-center gap-2"
+                        >
+                            {refetchBusy && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                            {refetchBusy ? 'Fetching…' : 'Re-fetch now'}
                         </Button>
                         <Button
                             variant="destructive"
                             onClick={remove}
-                            disabled={profile.status === 'fetching'}
+                            disabled={fetchInFlight || removing}
+                            className="inline-flex items-center gap-2"
                         >
-                            Remove
+                            {removing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                            {removing ? 'Removing…' : 'Remove'}
                         </Button>
                     </div>
                 </section>

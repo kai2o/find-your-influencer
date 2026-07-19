@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEvent } from 'react';
+import { LoaderCircle } from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 type ProfileRow = {
     id: number;
@@ -71,10 +72,27 @@ export default function WatchlistIndex({ profiles, filters }: Props) {
         q: filters.q,
         status: filters.status,
     });
+    const [removingId, setRemovingId] = useState<number | null>(null);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
         get('/watchlist', { preserveState: true });
+    };
+
+    const removeProfile = (profile: ProfileRow) => {
+        if (
+            !confirm(
+                `Remove @${profile.username} from the watchlist? Snapshots for this handle will be deleted.`,
+            )
+        ) {
+            return;
+        }
+
+        setRemovingId(profile.id);
+        router.delete(`/watchlist/${profile.id}`, {
+            preserveScroll: true,
+            onFinish: () => setRemovingId(null),
+        });
     };
 
     return (
@@ -117,8 +135,9 @@ export default function WatchlistIndex({ profiles, filters }: Props) {
                             <option value="failed">failed</option>
                         </select>
                     </div>
-                    <Button type="submit" disabled={processing} variant="secondary">
-                        Filter
+                    <Button type="submit" disabled={processing} variant="secondary" className="inline-flex items-center gap-2">
+                        {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                        {processing ? 'Filtering…' : 'Filter'}
                     </Button>
                 </form>
 
@@ -151,20 +170,17 @@ export default function WatchlistIndex({ profiles, filters }: Props) {
                                             type="button"
                                             size="sm"
                                             variant="destructive"
-                                            disabled={profile.status === 'fetching'}
+                                            className="inline-flex items-center gap-2"
+                                            disabled={profile.status === 'fetching' || removingId === profile.id}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (
-                                                    !confirm(
-                                                        `Remove @${profile.username} from the watchlist? Snapshots for this handle will be deleted.`,
-                                                    )
-                                                ) {
-                                                    return;
-                                                }
-                                                router.delete(`/watchlist/${profile.id}`, { preserveScroll: true });
+                                                removeProfile(profile);
                                             }}
                                         >
-                                            Remove
+                                            {removingId === profile.id && (
+                                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                                            )}
+                                            {removingId === profile.id ? 'Removing…' : 'Remove'}
                                         </Button>
                                     </td>
                                 </tr>
