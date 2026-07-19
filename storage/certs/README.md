@@ -1,18 +1,22 @@
-# CA certificates for Windows PHP (curl / openssl)
+# CA certificates (Windows PHP)
 
-`cacert.pem` is the Mozilla CA bundle used by PHP to verify HTTPS.
+PHP needs a CA bundle to verify HTTPS (Apify). Without it you get **cURL error 60**.
 
-If missing, download:
+## Setup
 
+1. Download the Mozilla bundle:
+
+   https://curl.se/ca/cacert.pem
+
+2. Save as `storage/certs/cacert.pem` (this file is gitignored).
+
+3. Set absolute paths in `php.ini`:
+
+```ini
+curl.cainfo = "C:/full/path/to/FindYourInfluencer/storage/certs/cacert.pem"
+openssl.cafile = "C:/full/path/to/FindYourInfluencer/storage/certs/cacert.pem"
 ```
-https://curl.se/ca/cacert.pem
-```
 
-Place it here, then set in `php.ini`:
+4. Restart `php artisan serve` and `php artisan queue:work`.
 
-```
-curl.cainfo = "C:\full\path\to\storage\certs\cacert.pem"
-openssl.cafile = "C:\full\path\to\storage\certs\cacert.pem"
-```
-
-Restart `php artisan serve` and `php artisan queue:work` after changing php.ini.
+The Apify client also falls back to this path (and `%LOCALAPPDATA%\fyi-cacert\cacert.pem`) when `curl.cainfo` is unset.
