@@ -35,7 +35,7 @@ jobs:
           php-version: '8.3'
           tools: composer:v2
           coverage: none
-          extensions: mbstring, xml, ctype, curl, dom, tokenizer, pdo, pdo_sqlite, redis, zip, bcmath, fileinfo, intl
+          extensions: mbstring, xml, ctype, curl, dom, tokenizer, pdo, pdo_sqlite, zip, bcmath, fileinfo, intl
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -53,13 +53,18 @@ jobs:
         run: npm run build
 
       - name: Prepare environment
+        id: prep
         run: |
           cp .env.example .env
-          php artisan key:generate --force
+          KEY="$(php artisan key:generate --show --no-ansi)"
+          echo "APP_KEY=$KEY" >> .env
+          echo "app_key=$KEY" >> "$GITHUB_OUTPUT"
 
       - name: Tests
         env:
-          APP_ENV: testing
+          # Keep APP_KEY in the process env. Do NOT set APP_ENV here — that would
+          # make Laravel ignore .env and boot without a key before phpunit.xml loads.
+          APP_KEY: ${{ steps.prep.outputs.app_key }}
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
           CACHE_STORE: array
