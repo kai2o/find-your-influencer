@@ -130,6 +130,7 @@ export default function WatchlistIndex({ profiles, filters }: Props) {
                                 <th className="px-3 py-2 font-medium">Status</th>
                                 <th className="px-3 py-2 font-medium">Followers</th>
                                 <th className="px-3 py-2 font-medium">Last refreshed (IST)</th>
+                                <th className="px-3 py-2 font-medium">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -145,11 +146,32 @@ export default function WatchlistIndex({ profiles, filters }: Props) {
                                     </td>
                                     <td className="px-3 py-2">{profile.followers_count?.toLocaleString() ?? '—'}</td>
                                     <td className="px-3 py-2">{formatIst(profile.last_refreshed_at)}</td>
+                                    <td className="px-3 py-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="destructive"
+                                            disabled={profile.status === 'fetching'}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (
+                                                    !confirm(
+                                                        `Remove @${profile.username} from the watchlist? Snapshots for this handle will be deleted.`,
+                                                    )
+                                                ) {
+                                                    return;
+                                                }
+                                                router.delete(`/watchlist/${profile.id}`, { preserveScroll: true });
+                                            }}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </td>
                                 </tr>
                             ))}
                             {profiles.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="text-muted-foreground px-3 py-8 text-center">
+                                    <td colSpan={5} className="text-muted-foreground px-3 py-8 text-center">
                                         No profiles yet. Add a handle to get started.
                                     </td>
                                 </tr>

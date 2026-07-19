@@ -51,6 +51,7 @@ class FetchProfileJob implements ShouldQueue
         $opsEvent = $ops->start('job', 'FetchProfileJob', $this->profileId, [
             'attempt' => $this->attempts(),
             'job_id' => $this->job?->getJobId() ?? 'sync',
+            'provider' => $provider::class,
         ]);
 
         $profile = Profile::query()->find($this->profileId);

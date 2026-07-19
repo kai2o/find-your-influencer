@@ -158,14 +158,32 @@ class WatchlistController extends Controller
                 : 'Re-fetch queued.');
     }
 
+    public function destroy(Profile $profile): RedirectResponse
+    {
+        if ($profile->status === ProfileStatus::Fetching) {
+            return Redirect::back()
+                ->with('error', 'Cannot remove a handle while a fetch is in progress.');
+        }
+
+        $username = $profile->username;
+        $profile->delete();
+
+        return Redirect::route('watchlist.index')
+            ->with('success', '@'.$username.' removed from the watchlist.');
+    }
+
     /**
-     * Fake (or missing Apify token) runs inline for instant UI; live Apify stays queued.
+     * Inline (sync) fetch only for Pest fake provider. Live Apify always goes through the queue.
      */
     private function usesSyncFetch(): bool
     {
+        if (! app()->environment('testing')) {
+            return false;
+        }
+
         $driver = config('services.profile.driver', 'apify');
 
-        return $driver === 'fake' || empty(config('services.apify.token'));
+        return $driver === 'fake' || empty(config('services.apify.token') ?: env('APIFY_TOKEN'));
     }
 
     private function dispatchFetch(int $profileId): void

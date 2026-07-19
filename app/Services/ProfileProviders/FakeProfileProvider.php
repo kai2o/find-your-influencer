@@ -5,11 +5,22 @@ namespace App\Services\ProfileProviders;
 use App\DataTransferObjects\ProfileData;
 use App\Services\Ops\OpsEventRecorder;
 use App\Services\TokenBucketLimiter;
+use RuntimeException;
 
 class FakeProfileProvider implements ProfileProvider
 {
     public function fetch(string $username): ProfileData
     {
+        $token = config('services.apify.token') ?: env('APIFY_TOKEN');
+
+        // Never overwrite live Apify profiles with demo data because a stale queue
+        // worker still has PROFILE_PROVIDER=fake / empty token in memory.
+        if (! app()->environment('testing') && filled($token)) {
+            throw new RuntimeException(
+                'FakeProfileProvider blocked: APIFY_TOKEN is set. Use Apify and restart `queue:work`.'
+            );
+        }
+
         $ops = app(OpsEventRecorder::class);
         $event = $ops->start('api', 'fake.fetch', meta: ['username' => $username]);
         $started = microtime(true);

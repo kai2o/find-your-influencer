@@ -33,16 +33,23 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(ProfileProvider::class, function () {
-            $driver = config('services.profile.driver', 'apify');
+            $driver = (string) config('services.profile.driver', 'apify');
+            // Prefer config, fall back to raw env (stale workers / uncleared assumptions).
+            $token = config('services.apify.token') ?: env('APIFY_TOKEN');
 
-            if ($driver === 'fake' || empty(config('services.apify.token'))) {
+            // Pest only. Never serve Fake while a real Apify token exists.
+            if ($this->app->environment('testing') && $driver === 'fake') {
                 return new FakeProfileProvider;
             }
 
-            return new ApifyProfileProvider(
-                token: (string) config('services.apify.token'),
-                actorId: (string) config('services.apify.actor_id', 'apify~instagram-profile-scraper'),
-            );
+            if (filled($token)) {
+                return new ApifyProfileProvider(
+                    token: (string) $token,
+                    actorId: (string) config('services.apify.actor_id', 'apify~instagram-profile-scraper'),
+                );
+            }
+
+            return new FakeProfileProvider;
         });
     }
 

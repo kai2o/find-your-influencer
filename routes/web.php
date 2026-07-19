@@ -23,6 +23,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/watchlist', [WatchlistController::class, 'store'])->name('watchlist.store');
     Route::get('/watchlist/{profile}', [WatchlistController::class, 'show'])->name('watchlist.show');
     Route::post('/watchlist/{profile}/refetch', [WatchlistController::class, 'refetch'])->name('watchlist.refetch');
+    Route::delete('/watchlist/{profile}', [WatchlistController::class, 'destroy'])->name('watchlist.destroy');
 
     Route::get('/performance', [PerformanceController::class, 'index'])->name('performance.index');
 });

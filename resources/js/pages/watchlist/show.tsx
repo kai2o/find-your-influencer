@@ -191,6 +191,17 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
         router.post(`/watchlist/${profile.id}/refetch`);
     };
 
+    const remove = () => {
+        if (
+            !confirm(
+                `Remove @${profile.username} from the watchlist? Snapshots for this handle will be deleted.`,
+            )
+        ) {
+            return;
+        }
+        router.delete(`/watchlist/${profile.id}`);
+    };
+
     const net = formatDelta(performance.period_net_delta);
     const gain = formatDelta(performance.largest_gain);
     const drop = formatDelta(performance.largest_drop);
@@ -206,7 +217,11 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
                             <img
                                 src={profile.profile_picture_url}
                                 alt={profile.username}
+                                referrerPolicy="no-referrer"
                                 className="size-20 rounded-full object-cover ring-1 ring-border"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                }}
                             />
                         ) : (
                             <div className="bg-muted size-20 rounded-full ring-1 ring-border" />
@@ -225,9 +240,18 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
                             )}
                         </div>
                     </div>
-                    <Button onClick={refetch} disabled={profile.status === 'fetching'}>
-                        Re-fetch now
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={refetch} disabled={profile.status === 'fetching'}>
+                            Re-fetch now
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={remove}
+                            disabled={profile.status === 'fetching'}
+                        >
+                            Remove
+                        </Button>
+                    </div>
                 </section>
 
                 {profile.status === 'failed' && profile.last_error && (

@@ -91,10 +91,13 @@ class ApifyProfileProvider implements ProfileProvider
                 );
             }
 
+            $pic = $item['profilePicUrlHD'] ?? $item['profilePicUrl'] ?? null;
+            $picUrl = is_string($pic) && $pic !== '' ? $pic : null;
+
             $data = new ProfileData(
                 username: (string) ($item['username'] ?? $username),
                 bio: isset($item['biography']) ? (string) $item['biography'] : null,
-                profilePictureUrl: isset($item['profilePicUrl']) ? (string) $item['profilePicUrl'] : null,
+                profilePictureUrl: $picUrl,
                 followersCount: (int) ($item['followersCount'] ?? 0),
                 followingCount: (int) ($item['followsCount'] ?? 0),
                 postsCount: (int) ($item['postsCount'] ?? 0),
