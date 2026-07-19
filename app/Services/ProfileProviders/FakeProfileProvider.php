@@ -14,13 +14,19 @@ class FakeProfileProvider implements ProfileProvider
         $event = $ops->start('api', 'fake.fetch', meta: ['username' => $username]);
         $started = microtime(true);
 
+        // Stable base metrics from username hash; slight time jitter so refetch shows a delta.
+        $seed = crc32(strtolower($username));
+        $baseFollowers = 10_000 + ($seed % 500_000);
+        $jitter = (int) (now()->timestamp % 17) - 8; // -8..+8
+        $followers = max(100, $baseFollowers + $jitter);
+
         $data = new ProfileData(
             username: $username,
-            bio: 'Fake bio for '.$username,
-            profilePictureUrl: 'https://example.com/'.$username.'.jpg',
-            followersCount: 1000 + strlen($username),
-            followingCount: 100,
-            postsCount: 50,
+            bio: 'Demo profile for @'.$username,
+            profilePictureUrl: 'https://i.pravatar.cc/150?u='.urlencode($username),
+            followersCount: $followers,
+            followingCount: 100 + ($seed % 400),
+            postsCount: 50 + ($seed % 200),
         );
 
         $ops->finish($event, 'success', [

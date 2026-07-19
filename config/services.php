@@ -44,6 +44,13 @@ return [
         'driver' => env('PROFILE_PROVIDER', 'apify'),
     ],
 
+    'rate_limits' => [
+        'enabled' => filter_var(env('RATE_LIMITS_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'token_bucket_capacity' => (int) env('TOKEN_BUCKET_CAPACITY', 100),
+        // Tokens refilled per minute (default 10 → ~1 every 6s).
+        'token_bucket_refill_per_minute' => (float) env('TOKEN_BUCKET_REFILL_PER_MINUTE', 10),
+    ],
+
     'webhook' => [
         'secret' => env('WEBHOOK_SECRET', 'change-me'),
     ],

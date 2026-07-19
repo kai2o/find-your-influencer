@@ -116,6 +116,9 @@ Details: [storage/certs/README.md](storage/certs/README.md).
 | `APIFY_ACTOR_ID` | Default `apify~instagram-profile-scraper` |
 | `PROFILE_PROVIDER` | `apify` or `fake` |
 | `API_DAILY_QUOTA` | Daily ceiling (IST-dated Redis key), default `1000` |
+| `TOKEN_BUCKET_CAPACITY` | Token bucket size, default `100` |
+| `TOKEN_BUCKET_REFILL_PER_MINUTE` | Refill rate, default `10` |
+| `RATE_LIMITS_ENABLED` | `true`/`false` — when false, bucket + quota always allow |
 | `WEBHOOK_SECRET` | HMAC secret for `POST /webhooks/{provider}` |
 | `QUEUE_CONNECTION` / `CACHE_STORE` | Prefer `redis` |
 | `GOOGLE_*` | Optional Google OAuth on login |
@@ -134,9 +137,33 @@ Proof: `tests/Feature/ConcurrencyTest.php` — held lock → 0 HTTP calls; unloc
 
 ### Rate limit + quota
 
-- **Token bucket:** capacity 100, refill 10/min; empty → delayed re-dispatch (not a failed attempt)
-- **Daily quota:** Redis `quota:YYYY-MM-DD` (Asia/Kolkata); refuse at 90% of ceiling; log and defer
+- **Token bucket:** capacity `TOKEN_BUCKET_CAPACITY` (default **100**), refill `TOKEN_BUCKET_REFILL_PER_MINUTE` (default **10**/min); empty → delayed re-dispatch (not a failed attempt)
+- **Daily quota:** Redis `quota:YYYY-MM-DD` (Asia/Kolkata); refuse at 90% of `API_DAILY_QUOTA` (default 1000)
+- **Bypass switch:** `RATE_LIMITS_ENABLED=false` skips bucket + quota checks (circuit breaker still applies)
 - **HTTP:** connect timeout **3s**, read timeout **60s**
+
+**Latency:** Apify’s sync actor typically takes **~8–15s** — that dominates add/refetch time, not the token bucket. For instant Loom demos set `PROFILE_PROVIDER=fake` (job runs inline via `dispatchSync`). Live Apify stays queued; detail UI polls every **500ms** while pending/fetching.
+
+Before recording, reset Redis guards if a prior failure opened the circuit:
+
+```bash
+php artisan tinker --execute="Illuminate\Support\Facades\Redis::del('api:token-bucket','circuit:apify:failures','circuit:apify:open_until','circuit:apify:half_open');"
+```
+
+### Benchmark timings
+
+```bash
+php artisan profiles:benchmark-fetch cristiano nasa --job
+```
+
+Reports provider `api_ms` and full job path `job_ms` (lock + quota + bucket + snapshot). Sample local run with `PROFILE_PROVIDER=fake`:
+
+| handle | api_ms | job_ms |
+|---|---:|---:|
+| demo_handle_a | 200 | 234 |
+| demo_handle_b | 2 | 25 |
+
+(First call includes cold DB/ops overhead; steady-state job is typically tens of ms.) With Apify, api/job are usually **multi-second** (~8–15s).
 
 ### Circuit breaker
 
@@ -160,6 +187,7 @@ Open → `release(120)` (deferred, not a failed attempt). Redis keys under `circ
 ```bash
 php artisan profiles:benchmark-fetch cristiano nasa natgeo
 php artisan profiles:benchmark-fetch cristiano --persist
+php artisan profiles:benchmark-fetch cristiano nasa --job
 ```
 
 ---
@@ -237,7 +265,7 @@ Covers watchlist Inertia props, job dispatch, concurrency lock, retry classifier
 ## Trade-offs
 
 1. **SQLite locally, Postgres for real runs** — faster Windows onboarding; advisory locks and INCLUDE indexes activate on `pgsql`.
-2. **FakeProfileProvider when token empty** — demos/tests without burning Apify credit; set `PROFILE_PROVIDER=apify` + token for live fetches.
+2. **FakeProfileProvider when token empty** — demos/tests without burning Apify credit; set `PROFILE_PROVIDER=apify` + token for live fetches. With fake, add/refetch uses `dispatchSync` so the UI lands on `fetched` immediately.
 
 ## Skipped
 
@@ -250,3 +278,5 @@ Covers watchlist Inertia props, job dispatch, concurrency lock, retry classifier
 - Status: `pending → fetching → fetched|failed`.
 - Scheduler every 10 minutes; stale = `last_refreshed_at` null or older than 1 hour.
 - Webhook endpoint is pull-friendly simulation (`POST /webhooks/{provider}`).
+
+`GET /healthz` — 200 when DB + Redis reachable and a queue job processed within 5 minutes; otherwise 503 `{"status":"degraded","failing":[...]}`.

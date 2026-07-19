@@ -77,10 +77,12 @@ class WatchlistController extends Controller
 
         if ($profile->wasRecentlyCreated || $profile->status === ProfileStatus::Failed || $profile->status === ProfileStatus::Pending) {
             $profile->update(['status' => ProfileStatus::Pending, 'last_error' => null]);
-            FetchProfileJob::dispatch($profile->id);
+            $this->dispatchFetch($profile->id);
 
             return Redirect::route('watchlist.show', $profile)
-                ->with('success', 'Profile queued for fetch.');
+                ->with('success', $this->usesSyncFetch()
+                    ? 'Profile fetched.'
+                    : 'Profile queued for fetch.');
         }
 
         return Redirect::route('watchlist.show', $profile)
@@ -148,9 +150,32 @@ class WatchlistController extends Controller
             'last_error' => null,
         ]);
 
-        FetchProfileJob::dispatch($profile->id);
+        $this->dispatchFetch($profile->id);
 
         return Redirect::route('watchlist.show', $profile)
-            ->with('success', 'Re-fetch queued.');
+            ->with('success', $this->usesSyncFetch()
+                ? 'Profile re-fetched.'
+                : 'Re-fetch queued.');
+    }
+
+    /**
+     * Fake (or missing Apify token) runs inline for instant UI; live Apify stays queued.
+     */
+    private function usesSyncFetch(): bool
+    {
+        $driver = config('services.profile.driver', 'apify');
+
+        return $driver === 'fake' || empty(config('services.apify.token'));
+    }
+
+    private function dispatchFetch(int $profileId): void
+    {
+        if ($this->usesSyncFetch()) {
+            FetchProfileJob::dispatchSync($profileId);
+
+            return;
+        }
+
+        FetchProfileJob::dispatch($profileId);
     }
 }

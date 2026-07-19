@@ -162,7 +162,7 @@ export default function WatchlistShow({ profile, snapshots, performance }: Props
 
         const timer = window.setInterval(() => {
             router.reload({ only: ['profile', 'snapshots', 'performance'] });
-        }, 3000);
+        }, 500);
 
         return () => window.clearInterval(timer);
     }, [profile.status, profile.id]);

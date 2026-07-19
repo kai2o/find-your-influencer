@@ -41,6 +41,10 @@ class ApiDailyQuota
      */
     public function allows(int $units = 1): bool
     {
+        if (! config('services.rate_limits.enabled', true)) {
+            return true;
+        }
+
         $used = $this->usedToday();
         $threshold = (int) floor($this->dailyCeiling * $this->refuseAtFraction);
 

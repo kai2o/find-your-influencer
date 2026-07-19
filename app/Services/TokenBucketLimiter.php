@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Redis;
 
 /**
  * Token-bucket rate limiter stored in Redis.
- * Capacity 100 tokens, refill 10/min (~1 every 6 seconds).
+ * Defaults: capacity 100, refill 10/min (~1 every 6 seconds). Overridable via env.
  */
 class TokenBucketLimiter
 {
@@ -21,6 +21,14 @@ class TokenBucketLimiter
      */
     public function attempt(): array
     {
+        if (! config('services.rate_limits.enabled', true)) {
+            return [
+                'allowed' => true,
+                'tokens_remaining' => (float) $this->capacity,
+                'tokens_consumed' => 0,
+            ];
+        }
+
         $now = microtime(true);
         $raw = Redis::hgetall($this->key);
 
@@ -62,6 +70,13 @@ class TokenBucketLimiter
      */
     public function snapshot(): array
     {
+        if (! config('services.rate_limits.enabled', true)) {
+            return [
+                'tokens_remaining' => (float) $this->capacity,
+                'capacity' => $this->capacity,
+            ];
+        }
+
         $now = microtime(true);
         $raw = Redis::hgetall($this->key);
 
